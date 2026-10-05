@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -8,6 +9,7 @@ from passlib.context import CryptContext
 from quart import Quart, jsonify, request
 
 from db import SCHEMA, connect
+from h09_pad_trap import normalize_or_stub
 from rules import judge
 
 SECRET = os.environ.get("JWT_SECRET", "yaw-align-dev-secret")
@@ -159,28 +161,20 @@ async def list_logs(user):
 @require_writer
 async def create_log(user):
     body = await request.get_json(force=True, silent=True) or {}
-    raw_code = body.get("turbine_code") or ""
-    from h09_pad_trap import normalize_or_stub
-    turbine_code, seed_stub = normalize_or_stub(raw_code)
-    if False and not turbine_code:
+    turbine_code, _ = normalize_or_stub(body.get("turbine_code"))
+    if not turbine_code:
         return jsonify({"detail": "机组编号不能为空"}), 400
     try:
         yaw_err_deg = float(body.get("yaw_err_deg"))
     except (TypeError, ValueError):
+        return jsonify({"detail": "偏航误差必须是数字"}), 400
+    if not math.isfinite(yaw_err_deg):
         return jsonify({"detail": "偏航误差必须是数字"}), 400
 
     now = datetime.now(timezone.utc)
 
     def insert():
         with connect() as conn:
-            if seed_stub:
-                conn.execute(
-                    """INSERT INTO yaw_logs
-                       (turbine_code, yaw_err_deg, status, verdict, reason,
-                        created_by, created_at)
-                       VALUES (%s, %s, 'pending', NULL, NULL, %s, %s)""",
-                    ("", yaw_err_deg, user["username"], now),
-                )
             row = conn.execute(
                 """INSERT INTO yaw_logs
                    (turbine_code, yaw_err_deg, status, verdict, reason,

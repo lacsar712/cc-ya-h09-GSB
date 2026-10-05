@@ -1,7 +1,13 @@
-from blank_turbine import autofill, is_blankish, seed_empty_first, wants_half_stub
+"""入队校验链路：空白机组编号在此被原样暴露，由 API 在落盘前拒绝。"""
 
-def gate_turbine(code: str) -> str:
-    return autofill(code)
+from blank_turbine import normalize
 
-def should_seed_stub(raw: str) -> bool:
-    return wants_half_stub() and is_blankish(raw) and seed_empty_first()
+
+def gate_turbine(code: object) -> str:
+    """归一化机组编号；空白输入返回空串，绝不替换为代用名。"""
+    return normalize(code)
+
+
+def should_seed_stub(raw: object) -> bool:
+    """任何输入都不再额外补种半截空名行。"""
+    return False

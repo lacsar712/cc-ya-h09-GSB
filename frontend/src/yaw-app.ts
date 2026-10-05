@@ -221,6 +221,16 @@ export class YawAlignApp extends LitElement {
 
   private async submitLog() {
     this.error = "";
+    const code = this.turbineCode.trim();
+    if (!code) {
+      this.error = "机组编号不能为空";
+      return;
+    }
+    const yaw = Number(this.yawErr);
+    if (!this.yawErr.trim() || !Number.isFinite(yaw)) {
+      this.error = "偏航误差必须是数字";
+      return;
+    }
     this.loading = true;
     try {
       const res = await fetch("/api/logs", {
@@ -230,8 +240,8 @@ export class YawAlignApp extends LitElement {
           ...this.authHeaders(),
         },
         body: JSON.stringify({
-          turbine_code: this.turbineCode,
-          yaw_err_deg: Number(this.yawErr),
+          turbine_code: code,
+          yaw_err_deg: yaw,
         }),
       });
       const data = await res.json();
