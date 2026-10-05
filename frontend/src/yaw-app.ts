@@ -220,6 +220,19 @@ export class YawAlignApp extends LitElement {
   }
 
   private async submitLog() {
+    // 防连点：请求在途时直接忽略后续点击，避免重复入队。
+    if (this.loading) return;
+    const code = this.turbineCode.trim();
+    const errDeg = Number(this.yawErr);
+    // 浏览器侧先挡一道（空白/全空格、非数字）；后端落盘前还有同样的最终校验。
+    if (!code) {
+      this.error = "机组编号不能为空";
+      return;
+    }
+    if (!Number.isFinite(errDeg)) {
+      this.error = "偏航误差必须是数字";
+      return;
+    }
     this.error = "";
     this.loading = true;
     try {
@@ -230,8 +243,8 @@ export class YawAlignApp extends LitElement {
           ...this.authHeaders(),
         },
         body: JSON.stringify({
-          turbine_code: this.turbineCode,
-          yaw_err_deg: Number(this.yawErr),
+          turbine_code: code,
+          yaw_err_deg: errDeg,
         }),
       });
       const data = await res.json();

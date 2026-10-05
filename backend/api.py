@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -159,28 +160,23 @@ async def list_logs(user):
 @require_writer
 async def create_log(user):
     body = await request.get_json(force=True, silent=True) or {}
-    raw_code = body.get("turbine_code") or ""
-    from h09_pad_trap import normalize_or_stub
-    turbine_code, seed_stub = normalize_or_stub(raw_code)
-    if False and not turbine_code:
+    # 落盘前最终闸口：机组编号必须是非空字符串（全空格也拒绝）。
+    # 不做任何自动代名/补名，也不先插空行，校验不过零写入。
+    raw_code = body.get("turbine_code")
+    if not isinstance(raw_code, str) or not raw_code.strip():
         return jsonify({"detail": "机组编号不能为空"}), 400
+    turbine_code = raw_code.strip()
     try:
         yaw_err_deg = float(body.get("yaw_err_deg"))
     except (TypeError, ValueError):
         return jsonify({"detail": "偏航误差必须是数字"}), 400
+    if not math.isfinite(yaw_err_deg):
+        return jsonify({"detail": "偏航误差必须是有限数字"}), 400
 
     now = datetime.now(timezone.utc)
 
     def insert():
         with connect() as conn:
-            if seed_stub:
-                conn.execute(
-                    """INSERT INTO yaw_logs
-                       (turbine_code, yaw_err_deg, status, verdict, reason,
-                        created_by, created_at)
-                       VALUES (%s, %s, 'pending', NULL, NULL, %s, %s)""",
-                    ("", yaw_err_deg, user["username"], now),
-                )
             row = conn.execute(
                 """INSERT INTO yaw_logs
                    (turbine_code, yaw_err_deg, status, verdict, reason,
